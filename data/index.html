@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lying Cards</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- Rotate device warning -->
+<div id="rotateWarning">
+  <svg viewBox="0 0 24 24" fill="currentColor">
+    <path d="M16.48 2.52c3.27 1.55 5.61 4.72 5.97 8.48h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32zm-6.25-.77c-.59-.59-1.54-.59-2.12 0L1.75 8.11c-.59.59-.59 1.54 0 2.12l12.02 12.02c.59.59 1.54.59 2.12 0l6.36-6.36c.59-.59.59-1.54 0-2.12L10.23 1.75zm4.6 19.44L2.81 9.17l6.36-6.36 12.02 12.02-6.36 6.36zm-7.31.29C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
+  </svg>
+  <p>🔄 Porfavor rota tu dispositivo</p>
+  <p style="font-size: 16px;">Este juego requiere orientación horizontal</p>
+</div>
+
+<!-- Main content -->
+<div id="content">
+
+<!--
+MARK: Lobby 
+-->
+<div id="lobbyArea">
+  <h2>🃏 Liar Game Lobby</h2>
+  <input id="name" placeholder="Tu nombre">
+  <button onclick="join()">Entrar</button>
+
+  <div id="adminControls" class="hidden">
+    <button onclick="startGame()">🎮 INICIAR PARTIDA</button>
+    <button onclick="cancelGame()" class="btn-cancel">❌ CANCELAR JUEGO</button>
+  </div>
+
+  <h3>Jugadores conectados:</h3>
+  <ul id="players"></ul>
+  
+  <div class="leave-section">
+    <button onclick="leaveGame()" class="btn-leave">🚪 SALIR</button>
+  </div>
+</div>
+
+<!--
+MARK: Game 
+-->
+<div id="gameArea" class="hidden">
+  <h2>🎲 Juego en curso</h2>
+  
+  <div id="gameAdminControls" class="hidden">
+    <button onclick="cancelGame()" class="btn-cancel">❌ CANCELAR JUEGO</button>
+  </div>
+  
+  <div id="tableInfo">
+    <h3>Carta de Mesa:</h3>
+    <div id="tableCard" class="card tableCard"></div>
+  </div>
+  
+  <div id="handInfo">
+    <h3>Tus cartas:</h3>
+    <div id="myHand"></div>
+  </div>
+  
+  <div id="turnInfo">
+    <h3 id="status"></h3>
+  </div>
+  
+  <div class="leave-section">
+    <button onclick="leaveGame()" class="btn-leave">🚪 SALIR</button>
+  </div>
+</div>
+
+</div>
+<!-- End of content -->
+
+<script>
+let ws = new WebSocket("ws://192.168.4.1/ws");
+let myId = -1;
+let myName = localStorage.getItem("playerName") || "";
+
+// Auto-fill name if stored
+if (myName) {
+  document.getElementById("name").value = myName;
+}
+
+// lowerCase and remove special characters, tildes, emojis, etc. Limit to 20 chars
+function cleanName(name) {
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+    .replace(/[^a-z0-9 ]/g, "") // Remove special chars
+    .trim()
+    .substring(0, 20); // Limit to 20 chars
+}
+
+function join() {
+  let name = document.getElementById("name").value.trim();
+  name = cleanName(name);
+  if (!name) {
+    alert("Por favor ingresa tu nombre");
+    return;
+  }
+  
+  // Store name for reconnection
+  localStorage.setItem("playerName", name);
+  myName = name;
+  
+  ws.send(JSON.stringify({
+    type: "JOIN_GAME",
+    data: { name: name }
+  }));
+}
+
+function startGame() {
+  ws.send(JSON.stringify({ type: "START_GAME" }));
+}
+
+function cancelGame() {
+  if (confirm("¿Estás seguro de que quieres cancelar el juego?")) {
+    ws.send(JSON.stringify({ type: "CANCEL_GAME" }));
+  }
+}
+
+function leaveGame() {
+  if (confirm("¿Estás seguro de que quieres salir del juego?")) {
+    // Clear localStorage
+    localStorage.removeItem("playerName");
+    
+    // Notify server about leaving
+    ws.send(JSON.stringify({ type: "LEAVE_GAME" }));
+
+    // Close WebSocket connection
+    ws.close();
+    
+    // Reload page to reset everything
+    location.reload();
+  }
+}
+
+ws.onmessage = (e) => {
+  let msg = JSON.parse(e.data);
+  console.log("Mensaje recibido:", msg);
+
+  if (msg.type === "GAME_JOINED") {
+    myId = msg.data.playerId;
+    console.log("Mi ID:", myId);
+
+    if (msg.data.isAdmin) {
+      document.getElementById("adminControls").classList.remove("hidden");
+      document.getElementById("gameAdminControls").classList.remove("hidden");
+    }
+  }
+  
+  if (msg.type === "RECONNECTED") {
+    myId = msg.data.playerId;
+    console.log("Reconectado como:", myName, "ID:", myId);
+    
+    // If game is in progress, show game area
+    if (msg.data.gameState !== "WAITING_PLAYERS") {
+      document.getElementById("lobbyArea").classList.add("hidden");
+      document.getElementById("gameArea").classList.remove("hidden");
+      
+      // Request current game state
+      ws.send(JSON.stringify({ type: "REQUEST_GAME_STATE" }));
+    }
+    
+    if (msg.data.isAdmin) {
+      document.getElementById("adminControls").classList.remove("hidden");
+      document.getElementById("gameAdminControls").classList.remove("hidden");
+    }
+  }
+
+  if (msg.type === "PLAYER_LIST_UPDATE") {
+    let ul = document.getElementById("players");
+    ul.innerHTML = "";
+
+    msg.data.players.forEach(p => {
+      let li = document.createElement("li");
+      li.textContent = `${p.name} ${p.alive ? '✅' : '💀'}`;
+      ul.appendChild(li);
+    });
+  }
+
+  if (msg.type === "GAME_STARTED") {
+    document.getElementById("status").innerText = "🎮 Iniciando partida...";
+  }
+
+  if (msg.type === "ROUND_STARTED") {
+    // Show game area, hide lobby
+    document.getElementById("lobbyArea").classList.add("hidden");
+    document.getElementById("gameArea").classList.remove("hidden");
+    
+    // Show table card
+    const tableColor = msg.data.tableColor;
+    const tableCard = document.getElementById("tableCard");
+    tableCard.className = `card ${tableColor}`;
+    tableCard.textContent = tableColor;
+    
+    console.log("Ronda iniciada - Color de mesa:", tableColor);
+  }
+
+  if (msg.type === "HAND_DEALT") {
+    // Show my cards
+    const myHand = document.getElementById("myHand");
+    myHand.innerHTML = "";
+    
+    let index = 0;
+    msg.data.cards.forEach(color => {
+      const cardDiv = document.createElement("div");
+      cardDiv.className = `card ${color} card-${index}`;
+      cardDiv.textContent = color;
+      myHand.appendChild(cardDiv);
+      index++;
+    });
+    
+    console.log("Cartas recibidas:", msg.data.cards);
+  }
+
+  if (msg.type === "TURN_CHANGED") {
+    const status = document.getElementById("status");
+    const playerName = msg.data.playerName;
+    
+    if (msg.data.playerId === myId) {
+      status.textContent = "🎯 ES TU TURNO";
+      status.style.color = "#2ecc71";
+    } else {
+      status.textContent = `⏳ Turno de: ${playerName}`;
+      status.style.color = "#95a5a6";
+    }
+    
+    console.log("Turno de:", playerName);
+  }
+  
+  if (msg.type === "GAME_STATE") {
+    // Restore game state after reconnection
+    if (msg.data.tableColor) {
+      const tableCard = document.getElementById("tableCard");
+      tableCard.className = `card ${msg.data.tableColor}`;
+      tableCard.textContent = msg.data.tableColor;
+    }
+    
+    if (msg.data.myCards) {
+      const myHand = document.getElementById("myHand");
+      myHand.innerHTML = "";
+      
+      msg.data.myCards.forEach(color => {
+        const cardDiv = document.createElement("div");
+        cardDiv.className = `card ${color}`;
+        cardDiv.textContent = color;
+        myHand.appendChild(cardDiv);
+      });
+    }
+  }
+  
+  if (msg.type === "GAME_CANCELLED") {
+    alert("El juego ha sido cancelado por el administrador");
+    // Reset to lobby
+    document.getElementById("gameArea").classList.add("hidden");
+    document.getElementById("lobbyArea").classList.remove("hidden");
+    document.getElementById("status").innerText = "";
+    document.getElementById("myHand").innerHTML = "";
+    document.getElementById("tableCard").innerHTML = "";
+    document.getElementById("tableCard").className = "card";
+  }
+};
+
+ws.onopen = () => {
+  console.log("Conectado al WebSocket");
+  
+  // Try to reconnect if we have a stored name
+  if (myName) {
+    ws.send(JSON.stringify({
+      type: "RECONNECT",
+      data: { name: myName }
+    }));
+  }
+};
+
+ws.onerror = (error) => {
+  console.error("Error WebSocket:", error);
+};
+
+ws.onclose = () => {
+  console.log("WebSocket cerrado");
+  // Try to reconnect after 2 seconds
+  setTimeout(() => {
+    console.log("Intentando reconectar...");
+    ws = new WebSocket("ws://192.168.4.1/ws");
+  }, 2000);
+};
+</script>
+
+</body>
+</html>

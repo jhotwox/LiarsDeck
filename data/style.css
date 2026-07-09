@@ -1,0 +1,136 @@
+/* Force landscape orientation */
+@media screen and (orientation: portrait) {
+  #rotateWarning {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #2c3e50;
+    color: white;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 9999;
+    font-size: 24px;
+    text-align: center;
+  }
+  #rotateWarning svg {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+    animation: rotate 2s infinite ease-in-out;
+  }
+  @keyframes rotate {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(90deg);
+    }
+  }
+  #content {
+    display: none !important;
+  }
+}
+
+body {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  margin: 0;
+  background: #ecf0f1;
+}
+.hidden {
+  display: none;
+}
+#gameArea {
+  margin-top: 20px;
+}
+.card {
+  display: inline-block;
+  padding: 10px 15px;
+  margin: 5px;
+  border: 2px solid #333;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.card:hover {
+  transform: translateY(-5px);
+}
+.card.tableCard {
+  transition: none;
+}
+.card.tableCard:hover {
+  transform: none;
+}
+.card.RED {
+  background: #ff6b6b;
+  color: white;
+}
+.card.BLUE {
+  background: #4dabf7;
+  color: white;
+}
+.card.GREEN {
+  background: #51cf66;
+  color: white;
+}
+.card.JOKER {
+  background: linear-gradient(135deg, #ff6b6b, #4dabf7, #51cf66);
+  color: white;
+}
+#tableCard {
+  font-size: 24px;
+}
+#status {
+  color: #495057;
+  font-weight: bold;
+}
+#rotateWarning {
+  display: none;
+}
+
+/* Buttons styling */
+button {
+  padding: 10px 20px;
+  margin: 5px;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+button:hover {
+  /* transform: translateY(-2px); */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-cancel {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #c0392b;
+}
+
+.btn-leave {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-leave:hover {
+  background: #7f8c8d;
+}
+
+.leave-section {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #bdc3c7;
+}
