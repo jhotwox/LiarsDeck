@@ -27,3 +27,26 @@ bool GameManager::reconnectPlayer(String name, uint32_t wsId) {
 }
 ```
 - [] Investigate and decide if we are gonna use a random color for tableColor or select one on the deck
+- [] Handle admin disconnection (set admin to the next player)
+Reference:
+``` C++
+// WebSocketHandler.cpp
+void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
+  if (game.reconnectPlayer(name, client->id())) {
+    int playerId = game.findPlayerByName(name);
+    
+    JsonDocument doc;
+    doc["type"] = "RECONNECTED";
+    doc["data"]["playerId"] = playerId;
+    doc["data"]["isAdmin"] = game.players[playerId].isAdmin;
+    doc["data"]["gameState"] = getGameStateString();
+    
+    client->text(msg);
+    
+    notifyPlayerList();
+  } else {
+    // Player not found, treat as new join
+    handleJoin(client, data);
+  }
+}
+```
