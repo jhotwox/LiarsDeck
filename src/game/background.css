@@ -1,0 +1,93 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #12002f;
+}
+
+.background {
+  position: fixed;
+  inset: 0;
+
+  overflow: hidden;
+
+  /* background:
+    radial-gradient(
+      ellipse at center,
+      #35008a 0%,
+      #1b0050 45%,
+      #080016 100%
+    ); */
+}
+
+.waves {
+  position: absolute;
+
+  width: 115%;
+  height: 115%;
+
+  top: -7.5%;
+  left: -7.5%;
+
+  overflow: visible;
+
+  /* animation: wavesMove 8s ease-in-out infinite; */
+}
+
+/* Las líneas */
+
+.wave-group path {
+  fill: none;
+
+  stroke: #7b2cff;
+  stroke-width: 24;
+
+  stroke-linecap: round;
+
+  filter:
+    drop-shadow(0 0 3px #512481)
+    drop-shadow(0 0 8px rgba(120, 0, 255, 0.45));
+}
+
+/* Movimiento principal */
+@keyframes wavesMove {
+
+  0% {
+    transform:
+      translate3d(0, 0, 0)
+      scale(1);
+  }
+
+  25% {
+    transform:
+      translate3d(-2%, -1%, 0)
+      scale(1.015);
+  }
+
+  50% {
+    transform:
+      translate3d(2%, 1.5%, 0)
+      scale(1.025);
+  }
+
+  75% {
+    transform:
+      translate3d(-1%, 1%, 0)
+      scale(1.01);
+  }
+
+  100% {
+    transform:
+      translate3d(0, 0, 0)
+      scale(1);
+  }
+}

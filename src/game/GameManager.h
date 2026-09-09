@@ -28,8 +28,11 @@ class GameManager {
     bool canJoin();
     int addPlayer(String name, uint32_t wsId);
     void disconnectPlayer(uint32_t wsId);
+    void removePlayer(uint32_t wsId);
     int findPlayerByName(String name);
     bool reconnectPlayer(String name, uint32_t wsId);
+    ResultCode selectAvatarForPlayer(int playerIndex, int8_t avatarIndex);
+    const bool* getAvailableAvatars();
     
     // Game control methods
     void startGame();

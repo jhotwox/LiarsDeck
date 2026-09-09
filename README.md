@@ -5,6 +5,11 @@
 Server is located on:
 > 192.168.4.1
 
+Listen to ESP32:
+``` BASH
+
+```
+
 TODO:
 - [] Link name with navigator ID or MAC adress
 - [] Don't allow joker to be table color
@@ -50,3 +55,18 @@ void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
   }
 }
 ```
+- [x] Add agentContext
+- [x] Add socket connection to postman
+- [] Add player leave handler (if is his turn, change turn and set new player number, also be sure to always deal cards counting player number)
+
+<!-- Design -->
+- [x] Delete white border blur from bg
+- [x] Align center player list
+- [x] Design red(close/exit) button
+- [x] Implement admin controls
+- [x] Show connected players
+- [x] Add avatar selector
+- [x] In-game connected players
+- [x] In-game avatar selector
+- [] Fix translate-Y on button focus (pressed)
+- [] Fix padding and height in player-list-container

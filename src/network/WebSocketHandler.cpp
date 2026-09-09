@@ -15,17 +15,48 @@ String colorToString(CardColor color) {
   }
 }
 
+String ResultCodeToString(ResultCode code) {
+  switch (code) {
+    case ResultCode::SUCCESS: return "SUCCESS";
+    case ResultCode::INVALID_PLAYER_INDEX: return "INVALID_PLAYER_INDEX";
+    case ResultCode::INVALID_AVATAR_INDEX: return "INVALID_AVATAR_INDEX";
+    case ResultCode::DUPLICATE_AVATAR: return "DUPLICATE_AVATAR";
+    default: return "UNKNOWN_ERROR";
+  }
+}
+
 void notifyPlayerList() {
   JsonDocument doc;
-
   doc["type"] = "PLAYER_LIST_UPDATE";
-  JsonArray arr = doc["data"]["players"].to<JsonArray>();
+  JsonObject data = doc["data"].to<JsonObject>();
+  JsonArray arr = data["players"].to<JsonArray>();
+  doc["data"]["gameState"] = getGameStateString();
 
-  for (int i = 0; i < game.playerCount; i++) {
+  for (int i = 0; i < game.playerCount || i < 4; i++) {
     JsonObject p = arr.add<JsonObject>();
-    p["id"] = game.players[i].id;
-    p["name"] = game.players[i].name;
-    p["alive"] = game.players[i].alive;
+    if (game.playerCount > i) {
+      p["id"] = game.players[i].id;
+      p["name"] = game.players[i].name;
+      p["alive"] = game.players[i].alive;
+      p["connected"] = game.players[i].connected;
+      p["handCount"] = game.players[i].handCount;
+      p["avatar"] = game.players[i].avatar;
+    } else {
+      p["id"] = i;
+      p["name"] = "vacio";
+      p["alive"] = true;
+      p["connected"] = true;
+      p["handCount"] = -1;
+      p["avatar"] = -1;
+    }
+  }
+
+  if (game.state == WAITING_PLAYERS) {
+    const bool *availableAvatars = game.getAvailableAvatars();
+    JsonArray avatarsArr = data["availableAvatars"].to<JsonArray>();
+    for (int i = 0; i < MAX_AVATARS; i++) {
+      avatarsArr.add(availableAvatars[i]);
+    }
   }
 
   String msg;
@@ -43,6 +74,7 @@ void cleanPlayerListExceptAdmin() {
     game.players[i].alive = false;
     game.players[i].handCount = 0;
     game.players[i].currentBullet = 0;
+    game.players[i].avatar = -1;
   }
   game.playerCount = 1;
   game.players[0] = admin;
@@ -69,7 +101,12 @@ void handleJoin(AsyncWebSocketClient *client, JsonVariant data) {
   doc["type"] = "GAME_JOINED";
   doc["data"]["playerId"] = id;
   doc["data"]["isAdmin"] = (id == 0);
-
+  JsonArray arr = doc["data"]["availableAvatars"].to<JsonArray>();
+  
+  const bool *availableAvatars = game.getAvailableAvatars();
+  for (int i = 0; i < MAX_AVATARS; i++)
+    arr.add(availableAvatars[i]);
+  
   String msg;
   serializeJson(doc, msg);
   client->text(msg);
@@ -82,8 +119,6 @@ void handleStartGame(AsyncWebSocketClient *client) {
   // Only admin can start the game
   if (client->id() != game.players[0].wsId) return;
 
-  game.startGame();
-
   JsonDocument doc;
   doc["type"] = "GAME_STARTED";
 
@@ -91,6 +126,8 @@ void handleStartGame(AsyncWebSocketClient *client) {
   serializeJson(doc, msg);
 
   ws.textAll(msg);
+
+  game.startGame();
 }
 
 // Admin press cancel game button, notify all players and reset the game state to WAITING_PLAYERS
@@ -120,8 +157,9 @@ void handleCancelGame(AsyncWebSocketClient *client) {
 void notifyRoundStarted() {
   JsonDocument doc;
   doc["type"] = "ROUND_STARTED";
-  doc["data"]["tableColor"] = colorToString(game.tableColor);
-  doc["data"]["firstPlayer"] = game.currentPlayerIndex;
+  JsonObject data = doc["data"].to<JsonObject>();
+  data["tableColor"] = colorToString(game.tableColor);
+  data["firstPlayer"] = (int)game.currentPlayerIndex;
   
   String msg;
   serializeJson(doc, msg);
@@ -156,8 +194,9 @@ void notifyHandDealt(uint8_t playerId) {
 void notifyTurnChanged() {
   JsonDocument doc;
   doc["type"] = "TURN_CHANGED";
-  doc["data"]["playerId"] = game.currentPlayerIndex;
-  doc["data"]["playerName"] = game.players[game.currentPlayerIndex].name;
+  JsonObject data = doc["data"].to<JsonObject>();
+  data["playerId"] = (int)game.currentPlayerIndex;
+  data["playerName"] = game.players[game.currentPlayerIndex].name;
   
   String msg;
   serializeJson(doc, msg);
@@ -190,7 +229,15 @@ void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
     doc["type"] = "RECONNECTED";
     doc["data"]["playerId"] = playerId;
     doc["data"]["isAdmin"] = game.players[playerId].isAdmin;
+    doc["data"]["avatar"] = game.players[playerId].avatar;
     doc["data"]["gameState"] = getGameStateString();
+
+    if (game.state == WAITING_PLAYERS) {
+      JsonArray arr = doc["data"]["availableAvatars"].to<JsonArray>();
+      const bool *availableAvatars = game.getAvailableAvatars();
+      for (int i = 0; i < MAX_AVATARS; i++)
+        arr.add(availableAvatars[i]);
+    }
     
     String msg;
     serializeJson(doc, msg);
@@ -222,9 +269,12 @@ void handleGameStateRequest(AsyncWebSocketClient *client) {
   
   JsonDocument doc;
   doc["type"] = "GAME_STATE";
-  doc["data"]["tableColor"] = colorToString(game.tableColor);
+  JsonObject data = doc["data"].to<JsonObject>();
+  data["tableColor"] = colorToString(game.tableColor);
+  data["currentPlayerId"] = (int)game.currentPlayerIndex;
+  data["currentPlayerName"] = game.players[game.currentPlayerIndex].name;
   
-  JsonArray cardsArr = doc["data"]["myCards"].to<JsonArray>();
+  JsonArray cardsArr = data["myCards"].to<JsonArray>();
   for (uint8_t i = 0; i < player.handCount; i++) {
     cardsArr.add(colorToString(player.handCards[i].color));
   }
@@ -278,8 +328,49 @@ void onWsEvent(
     }
 
     if (msgType == "LEAVE_GAME") {
-      game.disconnectPlayer(client->id());
+      game.removePlayer(client->id());
       notifyPlayerList();
+    }
+
+    if (msgType == "SELECT_AVATAR") {
+      int avatarId = doc["data"]["avatarId"];
+      int userId = doc["data"]["myId"];
+      
+      if (userId != -1) {
+        ResultCode result = game.selectAvatarForPlayer(userId, avatarId);
+        if (result == ResultCode::SUCCESS) {
+          notifyPlayerList();
+        } else {
+          // Handle error, e.g., send an error message back to the client
+          JsonDocument errorDoc;
+          errorDoc["type"] = "ERROR";
+          errorDoc["data"] = "Failed to select avatar";
+          errorDoc["Reason"] = ResultCodeToString(result);
+          String errorMsg;
+          serializeJson(errorDoc, errorMsg);
+          client->text(errorMsg);
+        }
+      }
+    }
+
+    // array where index is the avatar index - 1 and value is false if taken, true if available
+    if (msgType == "AVAILABLE_AVATARS") {
+      JsonDocument doc;
+      doc["type"] = "availableAvatarsResponse";
+      JsonArray arr = doc["data"]["availableAvatars"].to<JsonArray>();
+      
+      // Collect all avatars that are currently taken
+      // bool availableAvatars[MAX_AVATARS-1] = {true};
+      // This is a dynamic array, so we need to free it later
+      const bool *availableAvatars = game.getAvailableAvatars();
+      
+      // Fill the JSON array with available avatars
+      for (int i = 0; i < MAX_AVATARS; i++)
+        arr.add(availableAvatars[i]);
+      
+      String msg;
+      serializeJson(doc, msg);
+      client->text(msg);
     }
   }
 }

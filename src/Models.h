@@ -5,6 +5,7 @@
 #define REVOLVER_SIZE 6
 #define MAX_CARDS_PER_TURN 3
 #define DECK_SIZE 20 // MAX_PLAYERS * HAND_SIZE + 1 (table card maybe)
+#define MAX_AVATARS 8
 
 enum CardColor {
   RED, // 6 available
@@ -39,6 +40,19 @@ enum PlayerState {
   PLAYING // Player is currently playing their turn
 };
 
+// TODO: Change doc["type"] to ClientEvent enum for better type safety and clarity
+enum ClientEvent {
+  PLAYER_LIST_UPDATE,
+  // JOIN_GAME,
+  // RECONNECT,
+  // REQUEST_GAME_STATE,
+  // START_GAME,
+  // SELECT_AVATAR,
+  // PLAY_CARDS,
+  // TELL_LIAR,
+  // SHUT_REVOLVER
+};
+
 struct Card {
   CardColor color;
   
@@ -53,6 +67,7 @@ struct Player {
   String name;
   bool connected;
   bool alive;
+  int avatar; // Avatar index (0-7) // max 127 available avatars, -1 for no avatar
   uint32_t wsId;
   bool isAdmin;
   
@@ -87,4 +102,15 @@ struct Player {
   bool hasCards() {
     return handCount > 0;
   }
+};
+
+enum class ResultCode {
+  SUCCESS = 1,
+  ERROR = 0,
+  NOT_FOUND = -1,
+  DUPLICATE_NAME = -2,
+  DUPLICATE_AVATAR = -3,
+  INVALID_PLAYER_INDEX = -4,
+  INVALID_AVATAR_INDEX = -5,
+  LOBBY_FULL = -6,
 };

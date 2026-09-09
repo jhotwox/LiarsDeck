@@ -4,6 +4,7 @@
 
 GameManager game;
 
+// TODO: Handle better error codes with or use enum for error codes
 int GameManager::addPlayer(String name, uint32_t wsId) {
   if (isFull()) return -1;
 
@@ -23,15 +24,31 @@ int GameManager::addPlayer(String name, uint32_t wsId) {
   p.isAdmin = (playerCount == 0);  // First player is admin
   p.handCount = 0;
   p.currentBullet = 0;
+  p.avatar = -1; // Default to no avatar
 
   playerCount++;
   return p.id;
 }
 
+// Mark a player as disconnected based on their WebSocket ID (lost of connection)
 void GameManager::disconnectPlayer(uint32_t wsId) {
   for (int i = 0; i < playerCount; i++)
     if (players[i].wsId == wsId)
       players[i].connected = false;
+}
+
+// Remove a player from the game based on their WebSocket ID (used when a player leaves the game voluntarily)
+void GameManager::removePlayer(uint32_t wsId) {
+  for (int i = 0; i < playerCount; i++) {
+    if (players[i].wsId == wsId) {
+      // Shift players down to fill the gap
+      for (int j = i; j < playerCount - 1; j++) {
+        players[j] = players[j + 1];
+      }
+      playerCount--;
+      break;
+    }
+  }
 }
 
 int GameManager::findPlayerByName(String name) {
@@ -51,6 +68,38 @@ bool GameManager::reconnectPlayer(String name, uint32_t wsId) {
   players[playerIndex].connected = true;
   return true;
 }
+
+ResultCode GameManager::selectAvatarForPlayer(int playerIndex, int8_t avatarIndex) {
+  if (playerIndex < 0 || playerIndex >= playerCount) return ResultCode::INVALID_PLAYER_INDEX;
+  if (avatarIndex < 0 || avatarIndex > MAX_AVATARS) return ResultCode::INVALID_AVATAR_INDEX;
+
+  // Check if the avatar is already taken by another player
+  for (int i = 0; i < playerCount; i++) {
+    if (i != playerIndex && players[i].avatar == avatarIndex) {
+      return ResultCode::DUPLICATE_AVATAR; // Avatar already taken
+    }
+  }
+
+  players[playerIndex].avatar = avatarIndex;
+  return ResultCode::SUCCESS;
+}
+
+// Return array of available avatars (true if available, false if taken)
+const bool* GameManager::getAvailableAvatars() {
+  static bool availableAvatars[MAX_AVATARS];
+  
+  for (int i = 0; i < MAX_AVATARS; i++)
+    availableAvatars[i] = true; // Assume all avatars are available
+
+  for (int i = 0; i < game.playerCount; i++) {
+    int avatarIndex = game.players[i].avatar;
+    if (avatarIndex >= 0 && avatarIndex <= MAX_AVATARS)
+      availableAvatars[avatarIndex - 1] = false; // Mark as taken
+  }
+
+  return availableAvatars;
+}
+
 
 bool GameManager::isFull() {
   return playerCount >= MAX_PLAYERS;
@@ -121,6 +170,9 @@ void GameManager::startRound() {
   
   // 9. Notify initial turn
   notifyTurnChanged();
+
+  // 10. Notify updated player list (to update card counts in the game area)
+  notifyPlayerList();
 }
 
 // TODO: Make dynamic card deck length for number of players
@@ -160,7 +212,7 @@ void GameManager::shuffleDeck() {
 
 // 🎴 Deal 5 cards to each alive player
 void GameManager::dealCards() {
-  uint8_t cardIndex = 0;  // Start from 0 (card 0 is for the table)
+  uint8_t cardIndex = 0;  // Start dealing from the top of the deck
   
   for (uint8_t i = 0; i < playerCount; i++) {
     if (players[i].alive && players[i].connected) {
