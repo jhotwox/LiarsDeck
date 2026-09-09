@@ -10,6 +10,16 @@ Listen to ESP32:
 
 ```
 
+## License
+
+Lying Cards is licensed under the PolyForm Noncommercial License 1.0.0.
+
+You may use, modify, and redistribute this software for permitted
+noncommercial purposes. Commercial use requires separate permission
+from the copyright holder.
+
+See LICENSE for the complete license terms.
+
 TODO:
 - [] Link name with navigator ID or MAC adress
 - [] Don't allow joker to be table color
@@ -58,8 +68,10 @@ void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
 - [x] Add agentContext
 - [x] Add socket connection to postman
 - [] Add player leave handler (if is his turn, change turn and set new player number, also be sure to always deal cards counting player number)
+- [] Fix translate-Y on button focus (pressed)
+- [] Fix padding and height in player-list-container
 
-<!-- Design -->
+<!-- NOW -->
 - [x] Delete white border blur from bg
 - [x] Align center player list
 - [x] Design red(close/exit) button
@@ -68,5 +80,4 @@ void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
 - [x] Add avatar selector
 - [x] In-game connected players
 - [x] In-game avatar selector
-- [] Fix translate-Y on button focus (pressed)
-- [] Fix padding and height in player-list-container
+- [] Refactor html and css into diferent files
