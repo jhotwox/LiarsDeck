@@ -109,7 +109,7 @@ MARK: Game
 <div id="game-area" class="hidden">
   <div class="game-header">
     <div>
-      <h2 class="game-title">🎲 Juego en curso</h2>
+      <!-- <h2 class="game-title">🎲 Juego en curso</h2> -->
     </div>
     
     <div id="game-admin-controls" class="hidden">
@@ -136,7 +136,7 @@ MARK: Game
   </div>
   
   <div class="leave-section">
-    <button onclick="leaveGame()" class="btn-leave">🚪 SALIR</button>
+    <button onclick="leaveGame()" class="btn-leave red-btn">🚪 SALIR</button>
   </div>
 </div>
 
@@ -144,562 +144,527 @@ MARK: Game
 <!-- End of content -->
 
 <script>
-let ip = window.location.hostname;
-console.log("Conectando a WebSocket en:", ip);
-if (ip == "127.0.0.1") {
-  ip = "192.168.3.51"; // For testing on local network
-}
-let ws = new WebSocket(`ws://${ip}/ws`);
-let myId = -1;
-let myName = localStorage.getItem("playerName") || "";
-let myAvatar = -1;
-let isMyTurn = false;
-const MAX_CARDS_PER_TURN = 3;
-/* WAITING_PLAYERS,      // Waiting player in lobby
-  START_ROUND,          // Initializing round
-  PLAYER_TURN,          // Turn of a player
-  RESOLVING_CHALLENGE,  // Someone told LIAR
-  RUSSIAN_ROULETTE,     // Player shutting revolver
-  ROUND_END,            // End of the round
-  GAME_END              // Game finished (there is a winnner)
-*/
-let gameState = null;
-
-
-// TODO: Handle backend to return always 4 players, even if they are empty slots. Let currentPlayers always like this to view empty slots before joining a game.
-let currentPlayers = [
-  { id: 1, name: "Vacio", alive: true, connected: true, avatar: -1 },
-  { id: 2, name: "Vacio", alive: true, connected: true, avatar: -1 },
-  { id: 3, name: "Vacio", alive: true, connected: true, avatar: -1 },
-  { id: 4, name: "Vacio", alive: true, connected: true, avatar: -1 },
-];
-// TESTING: For testing purposes, you can uncomment the following line to simulate players in the lobby
-// let currentPlayers = [
-  // { id: 1, name: "Cris", alive: true, connected: true, avatar: 1 },
-  // { id: 2, name: "Kren", alive: true, connected: true, avatar: 2 },
-  // { id: 3, name: "Lili", alive: true, connected: true, avatar: 3 },
-  // { id: 4, name: "Fakako", alive: true, connected: true, avatar: 4 },
-  
-  // { id: 5, name: "John", alive: true, connected: true, avatar: 1 },
-  // { id: 6, name: "Doe", alive: true, connected: true, avatar: 2 },
-  // { id: 7, name: "Nath", alive: true, connected: true, avatar: 3 },
-  // { id: 8, name: "Conejoshi", alive: true, connected: true, avatar: 4 },
-  
-// ];
-
-let currentTurnPlayerId = -1;
-
-let avatarPage = 1;
-let avatars = [
-  true, true, true, true,
-  true, true, true, true,
-  // true, false, true, false,
-  // true, false, true, false,
-];
-
-// MARK: JS Lobby
-function renderAvatarOptions() {
-  const avatarOptionsDiv = document.getElementById("avatar-options");
-  avatarOptionsDiv.innerHTML = "";
-  
-  const avatarsPerPage = 8;
-  const startIndex = (avatarPage - 1) * avatarsPerPage;
-  const endIndex = Math.min(startIndex + avatarsPerPage, avatars.length);
-  const maxPerRow = 4; // 4 avatars per row
-  
-  console.log("Avatars: ", avatars)
-  console.log("Rendering avatars from index", startIndex, "to", endIndex - 1);
-  for (let i = startIndex; i < endIndex; i++) {
-    const avatarDiv = document.createElement("div");
-    
-    const row = Math.floor((i - startIndex) / maxPerRow);
-    const col = (i - startIndex) % maxPerRow;
-    avatarDiv.style.gridRow = row + 1;
-    avatarDiv.style.gridColumn = col + 1;
-    
-    avatarDiv.className = "avatar-option";
-    avatarDiv.dataset.avatarId = i + 1; // Avatar IDs are 1-based
-    avatarDiv.onclick = () => selectAvatar(i + 1);
-    
-    const img = document.createElement("img");
-    // Test
-    // img.src = `assets/avatar/Avatar${(i + 1)%5}.png`;
-    img.src = `assets/avatar/Avatar${(i + 1)}.png`;
-    img.alt = `Avatar ${i + 1}`;
-    img.classList.add("avatar-modal-img");
-    img.classList.add("prevent-select");
-
-    // If the avatar is not available, add a disabled class and disable click
-    if (!avatars[i]) {
-      img.classList.add("avatar-disabled");
-      avatarDiv.onclick = null;
+  const config = {
+    development: {
+      wsProtocol: "wss",
+      // wsHost: "192.168.3.51",
+      wsHost: window.location.hostname,
+    },
+    production: {
+      wsProtocol: "ws",
+      wsHost: window.location.hostname,
     }
+  }
+  
+  const wsConfig = config["development"];
+  const ip = wsConfig.wsHost;
+  const protocol = wsConfig.wsProtocol;
+
+  console.log("Conectando a WebSocket en:", ip);
+  
+  let ws = new WebSocket(`${protocol}://${ip}/ws`);
+  let myId = -1;
+  let myName = localStorage.getItem("playerName") || "";
+  let myAvatar = -1;
+  let isMyTurn = false;
+  const MAX_CARDS_PER_TURN = 3;
+  /* WAITING_PLAYERS,      // Waiting player in lobby
+    START_ROUND,          // Initializing round
+    PLAYER_TURN,          // Turn of a player
+    RESOLVING_CHALLENGE,  // Someone told LIAR
+    RUSSIAN_ROULETTE,     // Player shutting revolver
+    ROUND_END,            // End of the round
+    GAME_END              // Game finished (there is a winnner)
+  */
+  let gameState = null;
+
+
+  // TODO: Handle backend to return always 4 players, even if they are empty slots. Let currentPlayers always like this to view empty slots before joining a game.
+  let currentPlayers = [
+    { id: 1, name: "Vacio", alive: true, connected: true, avatar: -1 },
+    { id: 2, name: "Vacio", alive: true, connected: true, avatar: -1 },
+    { id: 3, name: "Vacio", alive: true, connected: true, avatar: -1 },
+    { id: 4, name: "Vacio", alive: true, connected: true, avatar: -1 },
+  ];
+  // TESTING: For testing purposes, you can uncomment the following line to simulate players in the lobby
+  // let currentPlayers = [
+    // { id: 1, name: "Cris", alive: true, connected: true, avatar: 1 },
+    // { id: 2, name: "Kren", alive: true, connected: true, avatar: 2 },
+    // { id: 3, name: "Lili", alive: true, connected: true, avatar: 3 },
+    // { id: 4, name: "Fakako", alive: true, connected: true, avatar: 4 },
     
-    avatarDiv.appendChild(img);
-    avatarOptionsDiv.appendChild(avatarDiv);
-  }
-  
-  // Update page indicator
-  const pageIndicator = document.getElementById("btn-page");
-  pageIndicator.textContent = `PAGINA ${avatarPage}/2`;
-}
+    // { id: 5, name: "John", alive: true, connected: true, avatar: 1 },
+    // { id: 6, name: "Doe", alive: true, connected: true, avatar: 2 },
+    // { id: 7, name: "Nath", alive: true, connected: true, avatar: 3 },
+    // { id: 8, name: "Conejoshi", alive: true, connected: true, avatar: 4 },
+    
+  // ];
 
-renderAvatarOptions();
+  let currentTurnPlayerId = -1;
 
-function nextPageAvatar() {
-  if (avatarPage < 2) {
-    avatarPage++;
-    renderAvatarOptions();
-  }
-}
+  let avatarPage = 1;
+  let avatars = [
+    true, true, true, true,
+    true, true, true, true,
+    // true, false, true, false,
+    // true, false, true, false,
+  ];
 
-function backPageAvatar() {
-  if (avatarPage > 1) {
-    avatarPage--;
-    renderAvatarOptions();
-  }
-}
+  // MARK: JS Lobby
+  function renderAvatarOptions() {
+    const avatarOptionsDiv = document.getElementById("avatar-options");
+    avatarOptionsDiv.innerHTML = "";
+    
+    const avatarsPerPage = 8;
+    const startIndex = (avatarPage - 1) * avatarsPerPage;
+    const endIndex = Math.min(startIndex + avatarsPerPage, avatars.length);
+    const maxPerRow = 4; // 4 avatars per row
+    
+    console.log("Avatars: ", avatars)
+    console.log("Rendering avatars from index", startIndex, "to", endIndex - 1);
+    for (let i = startIndex; i < endIndex; i++) {
+      const avatarDiv = document.createElement("div");
+      
+      const row = Math.floor((i - startIndex) / maxPerRow);
+      const col = (i - startIndex) % maxPerRow;
+      avatarDiv.style.gridRow = row + 1;
+      avatarDiv.style.gridColumn = col + 1;
+      
+      avatarDiv.className = "avatar-option";
+      avatarDiv.dataset.avatarId = i + 1; // Avatar IDs are 1-based
+      avatarDiv.onclick = () => selectAvatar(i + 1);
+      
+      const img = document.createElement("img");
+      // Test
+      // img.src = `assets/avatar/Avatar${(i + 1)%5}.png`;
+      img.src = `assets/avatar/Avatar${(i + 1)}.png`;
+      img.alt = `Avatar ${i + 1}`;
+      img.classList.add("avatar-modal-img");
+      img.classList.add("prevent-select");
 
-function selectAvatar(avatarId) {
-  // Check if the avatar is available
-  console.log("Seleccionando avatar:", avatarId, "\nTipo: ", typeof avatarId);
-  const index = avatarId - 1;
-  console.log("Índice del avatar:", index);
-  if (avatars[index] === false) {
-    console.log("Avatar no disponible: ", avatarId);
-    alert("Este avatar no está disponible. Por favor selecciona otro.");
-    return;
-  }
-
-  
-  // Send the selected avatar to the server
-  try {
-    ws.send(JSON.stringify({
-      type: "SELECT_AVATAR",
-      data: {
-        myId: myId,
-        avatarId: avatarId
+      // If the avatar is not available, add a disabled class and disable click
+      if (!avatars[i]) {
+        img.classList.add("avatar-disabled");
+        avatarDiv.onclick = null;
       }
-    }));
+      
+      avatarDiv.appendChild(img);
+      avatarOptionsDiv.appendChild(avatarDiv);
+    }
     
-    // Update the UI to reflect the selected avatar
-    updateAvatarSelectorUI(avatarId);
-    myAvatar = avatarId;
-    
-    // Close the modal after selection
-    closeAvatarModalFunc();
-  } catch (err) {
-    console.error("Error al enviar el avatar seleccionado:", err);
+    // Update page indicator
+    const pageIndicator = document.getElementById("btn-page");
+    pageIndicator.textContent = `PAGINA ${avatarPage}/2`;
   }
 
-}
+  renderAvatarOptions();
 
-function updateAvatarSelectorUI(avatarId) {
-  const selectedAvatarImg = document.getElementById("selected-avatar");
-  selectedAvatarImg.src = `assets/avatar/Avatar${(avatarId)}.png`;
-  selectedAvatarImg.dataset.avatarId = avatarId;
-}
-
-// TODO: Toggle if render players on lobby or in game
-function renderPlayers() {
-  // 1. Render lobby player list
-  console.log("Renderizando jugadores. Estado del juego:", gameState);
-  if (gameState === "WAITING_PLAYERS") {
-    function listPlayer(p) {
-      const aliveEmoji = p.alive ? '💚' : '💀';
-      const connEmoji = p.connected ? '🛜' : '❌';
-      return `
-      <div class="list-player-container">
-        <img src="assets/avatar/Avatar${p.avatar}.png" alt="Avatar" class="avatar-border" id="avatar-player-list">
-        <span class="avatar-name">${p.name}</span>
-      </div>
-      `;
-    }
-
-    const ul = document.getElementById("players");
-    if (ul) {
-      ul.innerHTML = "";
-      currentPlayers.forEach(p => {
-        const li = document.createElement("li");
-        li.innerHTML = listPlayer(p);
-        ul.appendChild(li);
-      });
+  function nextPageAvatar() {
+    if (avatarPage < 2) {
+      avatarPage++;
+      renderAvatarOptions();
     }
   }
 
-  // 2. Render game player list (excluding ourselves, positioned around the table)
-  const gamePlayersDiv = document.getElementById("game-players");
-  if (gamePlayersDiv) {
-    gamePlayersDiv.innerHTML = "";
-    
-    // Find all other players in clockwise order starting from me
-    const otherPlayers = [];
-    const total = currentPlayers.length;
-    if (myId !== -1 && total > 0) {
-      let myIndex = currentPlayers.findIndex(p => p.id === myId);
-      if (myIndex !== -1) {
-        for (let i = 1; i < total; i++) {
-          otherPlayers.push(currentPlayers[(myIndex + i) % total]);
-        }
-      }
-    } else {
-      // Fallback if myId is not set yet
-      currentPlayers.forEach(p => {
-        if (p.id !== myId) {
-          otherPlayers.push(p);
-        }
-      });
+  function backPageAvatar() {
+    if (avatarPage > 1) {
+      avatarPage--;
+      renderAvatarOptions();
     }
-    
-    // Render each other player with a position class
-    otherPlayers.forEach((p, idx) => {
-      const playerCard = document.createElement("div");
-      playerCard.className = "player-status-card";
-      
-      // Determine position class based on how many other players there are
-      let positionClass = "";
-      if (otherPlayers.length === 1) {
-        positionClass = "pos-top";
-      } else if (otherPlayers.length === 2) {
-        positionClass = idx === 0 ? "pos-left" : "pos-right";
-      } else { // 3 other players
-        if (idx === 0) positionClass = "pos-left";
-        else if (idx === 1) positionClass = "pos-top";
-        else positionClass = "pos-right";
-      }
-      playerCard.classList.add(positionClass);
-      
-      if (p.id === currentTurnPlayerId) {
-        playerCard.classList.add("active");
-      }
-      if (!p.alive) {
-        playerCard.classList.add("dead");
-      }
-      
-      const headerDiv = document.createElement("div");
-      headerDiv.style.display = "flex";
-      headerDiv.style.justifyContent = "space-between";
-      headerDiv.style.alignItems = "center";
-      
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "player-name";
-      nameSpan.textContent = p.name;
-      
-      const statusSpan = document.createElement("span");
-      statusSpan.className = "player-status-emojis";
-      const aliveEmoji = p.alive ? '💚' : '💀';
-      const connEmoji = p.connected ? '🛜' : '❌';
-      statusSpan.textContent = `${aliveEmoji} ${connEmoji}`;
-      
-      headerDiv.appendChild(nameSpan);
-      headerDiv.appendChild(statusSpan);
-      
-      // Render face-down cards
-      const cardsDiv = document.createElement("div");
-      cardsDiv.className = "player-back-cards";
-      
-      const cardsCount = p.handCount || 0;
-      for (let i = 0; i < cardsCount; i++) {
-        const cardBack = document.createElement("div");
-        cardBack.className = "card card-back";
-        cardsDiv.appendChild(cardBack);
-      }
-      
-      playerCard.appendChild(headerDiv);
-      playerCard.appendChild(cardsDiv);
-      
-      gamePlayersDiv.appendChild(playerCard);
-    });
-  }
-}
-
-renderPlayers();
-
-// Detect if it is a touch device
-const isTouchDevice = () => {
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-};
-
-// Check if mobile orientation warning is needed
-const isMobileDevice = () => {
-  return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
-};
-
-if (isMobileDevice()) {
-  document.getElementById("rotate-warning").classList.remove("hidden");
-}
-
-if (isTouchDevice()) {
-  document.body.classList.add("mobile-device");
-}
-
-// MARK: JS Modal
-var avatarModal = document.getElementById("avatar-modal");
-var avatarBtn = document.getElementById("avatar-btn");
-var closeAvatarModal = document.getElementById("btn-modal-close");
-
-function openAvatarModalFunc() {
-  document.getElementById("avatar-modal").style.display = "block";
-}
-
-function closeAvatarModalFunc() {
-  document.getElementById("avatar-modal").style.display = "none";
-}
-
-avatarBtn.onClick = openAvatarModalFunc;
-closeAvatarModal.onclick = closeAvatarModalFunc;
-
-window.onClick = function(event) {
-  if (event.target == avatarModal) {
-    avatarModal.style.display = "none";
-  }
-};
-
-function clearSelection() {
-  const selectedCards = document.querySelectorAll("#my-hand .card.selected");
-  selectedCards.forEach(card => card.classList.remove("selected"));
-}
-
-// Click listener to toggle card selection (only on player's turn, max 3)
-const myHandElement = document.getElementById("my-hand");
-myHandElement.addEventListener("click", (e) => {
-  const cardDiv = e.target.closest(".card");
-  if (!cardDiv) return;
-
-  if (!isMyTurn) {
-    console.log("No es tu turno, no puedes seleccionar cartas.");
-    return;
   }
 
-  if (cardDiv.classList.contains("selected")) {
-    cardDiv.classList.remove("selected");
-  } else {
-    const selectedCards = myHandElement.querySelectorAll(".card.selected");
-    if (selectedCards.length >= MAX_CARDS_PER_TURN) {
-      // Trigger shake animation on the newly clicked card as feedback
-      cardDiv.classList.add("shake");
-      cardDiv.addEventListener("animationend", () => {
-        cardDiv.classList.remove("shake");
-      }, { once: true });
+  function selectAvatar(avatarId) {
+    // Check if the avatar is available
+    console.log("Seleccionando avatar:", avatarId, "\nTipo: ", typeof avatarId);
+    const index = avatarId - 1;
+    console.log("Índice del avatar:", index);
+    if (avatars[index] === false) {
+      console.log("Avatar no disponible: ", avatarId);
+      alert("Este avatar no está disponible. Por favor selecciona otro.");
       return;
     }
-    cardDiv.classList.add("selected");
-  }
-});
 
-// Auto-fill name if stored
-if (myName) {
-  document.getElementById("input-name").value = myName;
-}
-
-// lowerCase and remove special characters, tildes, emojis, etc. Limit to 20 chars
-function cleanName(name) {
-  return name.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
-    .replace(/[^a-z0-9 ]/g, "") // Remove special chars
-    .trim()
-    .substring(0, 20); // Limit to 20 chars
-}
-
-function sound(name) {
-  const sound = document.getElementById(name);
-  if (sound) {
-    sound.currentTime = 0;
-    sound.play();
-  }
-}
-
-function btnClickCallback(soundName = "click-sound", callback) {
-  sound(soundName);
-  if (callback && typeof callback === "function") {
-    callback();
-  }
-}
-
-function join() {
-  let name = document.getElementById("input-name").value.trim();
-  name = cleanName(name);
-  if (!name) {
-    alert("Por favor ingresa tu nombre");
-    return;
-  }
-  
-  // Store name for reconnection
-  localStorage.setItem("playerName", name);
-  myName = name;
-  
-  ws.send(JSON.stringify({
-    type: "JOIN_GAME",
-    data: { name: name }
-  }));
-}
-
-function startGame() {
-  ws.send(JSON.stringify({ type: "START_GAME" }));
-}
-
-function cancelGame() {
-  if (confirm("¿Estás seguro de que quieres cancelar el juego?")) {
-    ws.send(JSON.stringify({ type: "CANCEL_GAME" }));
-  }
-}
-
-function leaveGame() {
-  if (confirm("¿Estás seguro de que quieres salir del juego?")) {
-    // Clear localStorage
-    localStorage.removeItem("playerName");
     
-    // Notify server about leaving
-    ws.send(JSON.stringify({ type: "LEAVE_GAME" }));
-
-    // Close WebSocket connection
-    ws.close();
-    
-    // Reload page to reset everything
-    location.reload();
-  }
-}
-
-ws.onmessage = (e) => {
-  let msg = JSON.parse(e.data);
-  console.log("Mensaje recibido:", msg);
-
-  if (msg.type === "GAME_JOINED") {
-    myId = msg.data.playerId;
-    console.log("Mi ID:", myId);
-
-    if (msg.data.isAdmin) {
-      document.getElementById("admin-controls").classList.remove("hidden");
-      document.getElementById("game-admin-controls").classList.remove("hidden");
-    }
-
-    // Activate avatar selection based on server response
-    if (msg.data.availableAvatars) {
-      avatars = msg.data.availableAvatars;
-    }
-
-    let avatarBtn = document.getElementById("avatar-btn");
-    avatarBtn.classList.remove("no-pointer-events");
-    avatarBtn.onclick = openAvatarModalFunc;
-  }
-  
-  if (msg.type === "RECONNECTED") {
-    myId = msg.data.playerId;
-    myAvatar = msg.data.avatar || -1; // Default to -1 if not provided
-    gameState = msg.data.gameState;
-    console.log("Reconectado como:", myName, "\nID:", myId, "\nAvatar:", myAvatar, "\nEstado del juego:", gameState);
-    
-    // If game is in progress, show game area
-    if (msg.data.gameState !== "WAITING_PLAYERS") {
-      document.getElementById("lobby-area").classList.add("hidden");
-      document.getElementById("game-area").classList.remove("hidden");
+    // Send the selected avatar to the server
+    try {
+      ws.send(JSON.stringify({
+        type: "SELECT_AVATAR",
+        data: {
+          myId: myId,
+          avatarId: avatarId
+        }
+      }));
       
-      // Request current game state
-      ws.send(JSON.stringify({ type: "REQUEST_GAME_STATE" }));
+      // Update the UI to reflect the selected avatar
+      updateAvatarSelectorUI(avatarId);
+      myAvatar = avatarId;
+      
+      // Close the modal after selection
+      closeAvatarModalFunc();
+    } catch (err) {
+      console.error("Error al enviar el avatar seleccionado:", err);
+    }
+
+  }
+
+  function updateAvatarSelectorUI(avatarId) {
+    const selectedAvatarImg = document.getElementById("selected-avatar");
+    selectedAvatarImg.src = `assets/avatar/Avatar${(avatarId)}.png`;
+    selectedAvatarImg.dataset.avatarId = avatarId;
+  }
+
+  // TODO: Toggle if render players on lobby or in game
+  function renderPlayers() {
+    // 1. Render lobby player list
+    console.log("Renderizando jugadores. Estado del juego:", gameState);
+    if (gameState === "WAITING_PLAYERS") {
+      function listPlayer(p) {
+        const aliveEmoji = p.alive ? '💚' : '💀';
+        const connEmoji = p.connected ? '🛜' : '❌';
+        return `
+        <div class="list-player-container">
+          <img src="assets/avatar/Avatar${p.avatar}.png" alt="Avatar" class="avatar-border" id="avatar-player-list">
+          <span class="avatar-name">${p.name}</span>
+        </div>
+        `;
+      }
+
+      const ul = document.getElementById("players");
+      if (ul) {
+        ul.innerHTML = "";
+        currentPlayers.forEach(p => {
+          const li = document.createElement("li");
+          li.innerHTML = listPlayer(p);
+          ul.appendChild(li);
+        });
+      }
+    }
+
+    // 2. Render game player list (excluding ourselves, positioned around the table)
+    const gamePlayersDiv = document.getElementById("game-players");
+    if (gamePlayersDiv) {
+      gamePlayersDiv.innerHTML = "";
+      
+      // Find all other players in clockwise order starting from me
+      const otherPlayers = [];
+      const total = currentPlayers.length;
+      if (myId !== -1 && total > 0) {
+        let myIndex = currentPlayers.findIndex(p => p.id === myId);
+        if (myIndex !== -1) {
+          for (let i = 1; i < total; i++) {
+            otherPlayers.push(currentPlayers[(myIndex + i) % total]);
+          }
+        }
+      } else {
+        // Fallback if myId is not set yet
+        currentPlayers.forEach(p => {
+          if (p.id !== myId) {
+            otherPlayers.push(p);
+          }
+        });
+      }
+      
+      // Render each other player with a position class
+      otherPlayers.forEach((p, idx) => {
+        const playerCard = document.createElement("div");
+        playerCard.className = "player-status-card";
+        
+        // Determine position class based on how many other players there are
+        let positionClass = "";
+        if (otherPlayers.length === 1) {
+          positionClass = "pos-top";
+        } else if (otherPlayers.length === 2) {
+          positionClass = idx === 0 ? "pos-left" : "pos-right";
+        } else { // 3 other players
+          if (idx === 0) positionClass = "pos-left";
+          else if (idx === 1) positionClass = "pos-top";
+          else positionClass = "pos-right";
+        }
+        playerCard.classList.add(positionClass);
+        
+        if (p.id === currentTurnPlayerId) {
+          playerCard.classList.add("active");
+        }
+        if (!p.alive) {
+          playerCard.classList.add("dead");
+        }
+        
+        const headerDiv = document.createElement("div");
+        headerDiv.style.display = "flex";
+        headerDiv.style.justifyContent = "space-between";
+        headerDiv.style.alignItems = "center";
+        
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "player-name";
+        nameSpan.textContent = p.name;
+        
+        const statusSpan = document.createElement("span");
+        statusSpan.className = "player-status-emojis";
+        const aliveEmoji = p.alive ? '💚' : '💀';
+        const connEmoji = p.connected ? '🛜' : '❌';
+        statusSpan.textContent = `${aliveEmoji} ${connEmoji}`;
+        
+        headerDiv.appendChild(nameSpan);
+        headerDiv.appendChild(statusSpan);
+        
+        // Render face-down cards
+        const cardsDiv = document.createElement("div");
+        cardsDiv.className = "player-back-cards";
+        
+        const cardsCount = p.handCount || 0;
+        for (let i = 0; i < cardsCount; i++) {
+          const cardBack = document.createElement("div");
+          cardBack.className = "card card-back";
+          cardsDiv.appendChild(cardBack);
+        }
+        
+        playerCard.appendChild(headerDiv);
+        playerCard.appendChild(cardsDiv);
+        
+        gamePlayersDiv.appendChild(playerCard);
+      });
+    }
+  }
+
+  renderPlayers();
+
+  // Detect if it is a touch device
+  const isTouchDevice = () => {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+  };
+
+  // Check if mobile orientation warning is needed
+  const isMobileDevice = () => {
+    return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
+  };
+
+  if (isMobileDevice()) {
+    document.getElementById("rotate-warning").classList.remove("hidden");
+  }
+
+  if (isTouchDevice()) {
+    document.body.classList.add("mobile-device");
+  }
+
+  // MARK: JS Modal
+  var avatarModal = document.getElementById("avatar-modal");
+  var avatarBtn = document.getElementById("avatar-btn");
+  var closeAvatarModal = document.getElementById("btn-modal-close");
+
+  function openAvatarModalFunc() {
+    document.getElementById("avatar-modal").style.display = "block";
+  }
+
+  function closeAvatarModalFunc() {
+    document.getElementById("avatar-modal").style.display = "none";
+  }
+
+  avatarBtn.onClick = openAvatarModalFunc;
+  closeAvatarModal.onclick = closeAvatarModalFunc;
+
+  window.onClick = function(event) {
+    if (event.target == avatarModal) {
+      avatarModal.style.display = "none";
+    }
+  };
+
+  function clearSelection() {
+    const selectedCards = document.querySelectorAll("#my-hand .card.selected");
+    selectedCards.forEach(card => card.classList.remove("selected"));
+  }
+
+  // Click listener to toggle card selection (only on player's turn, max 3)
+  const myHandElement = document.getElementById("my-hand");
+  myHandElement.addEventListener("click", (e) => {
+    const cardDiv = e.target.closest(".card");
+    if (!cardDiv) return;
+
+    if (!isMyTurn) {
+      console.log("No es tu turno, no puedes seleccionar cartas.");
+      return;
+    }
+
+    if (cardDiv.classList.contains("selected")) {
+      cardDiv.classList.remove("selected");
     } else {
-      // Update available avatars based on current players
+      const selectedCards = myHandElement.querySelectorAll(".card.selected");
+      if (selectedCards.length >= MAX_CARDS_PER_TURN) {
+        // Trigger shake animation on the newly clicked card as feedback
+        cardDiv.classList.add("shake");
+        cardDiv.addEventListener("animationend", () => {
+          cardDiv.classList.remove("shake");
+        }, { once: true });
+        return;
+      }
+      cardDiv.classList.add("selected");
+    }
+  });
+
+  // Auto-fill name if stored
+  if (myName) {
+    document.getElementById("input-name").value = myName;
+  }
+
+  // lowerCase and remove special characters, tildes, emojis, etc. Limit to 20 chars
+  function cleanName(name) {
+    return name.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-z0-9 ]/g, "") // Remove special chars
+      .trim()
+      .substring(0, 20); // Limit to 20 chars
+  }
+
+  function sound(name) {
+    const sound = document.getElementById(name);
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play();
+    }
+  }
+
+  function btnClickCallback(soundName = "click-sound", callback) {
+    sound(soundName);
+    if (callback && typeof callback === "function") {
+      callback();
+    }
+  }
+
+  function join() {
+    let name = document.getElementById("input-name").value.trim();
+    name = cleanName(name);
+    if (!name) {
+      alert("Por favor ingresa tu nombre");
+      return;
+    }
+    
+    // Store name for reconnection
+    localStorage.setItem("playerName", name);
+    myName = name;
+    
+    ws.send(JSON.stringify({
+      type: "JOIN_GAME",
+      data: { name: name }
+    }));
+  }
+
+  function startGame() {
+    ws.send(JSON.stringify({ type: "START_GAME" }));
+  }
+
+  function cancelGame() {
+    if (confirm("¿Estás seguro de que quieres cancelar el juego?")) {
+      ws.send(JSON.stringify({ type: "CANCEL_GAME" }));
+    }
+  }
+
+  function leaveGame() {
+    if (confirm("¿Estás seguro de que quieres salir del juego?")) {
+      // Clear localStorage
+      localStorage.removeItem("playerName");
+      
+      // Notify server about leaving
+      ws.send(JSON.stringify({ type: "LEAVE_GAME" }));
+
+      // Close WebSocket connection
+      ws.close();
+      
+      // Reload page to reset everything
+      location.reload();
+    }
+  }
+
+  ws.onmessage = (e) => {
+    let msg = JSON.parse(e.data);
+    console.log("Mensaje recibido:", msg);
+
+    if (msg.type === "GAME_JOINED") {
+      myId = msg.data.playerId;
+      console.log("Mi ID:", myId);
+
+      if (msg.data.isAdmin) {
+        document.getElementById("admin-controls").classList.remove("hidden");
+        document.getElementById("game-admin-controls").classList.remove("hidden");
+      }
+
+      // Activate avatar selection based on server response
       if (msg.data.availableAvatars) {
         avatars = msg.data.availableAvatars;
       }
 
-      updateAvatarSelectorUI(myAvatar);
       let avatarBtn = document.getElementById("avatar-btn");
       avatarBtn.classList.remove("no-pointer-events");
       avatarBtn.onclick = openAvatarModalFunc;
     }
     
-    if (msg.data.isAdmin) {
-      document.getElementById("admin-controls").classList.remove("hidden");
-      document.getElementById("game-admin-controls").classList.remove("hidden");
+    if (msg.type === "RECONNECTED") {
+      myId = msg.data.playerId;
+      myAvatar = msg.data.avatar || -1; // Default to -1 if not provided
+      gameState = msg.data.gameState;
+      console.log("Reconectado como:", myName, "\nID:", myId, "\nAvatar:", myAvatar, "\nEstado del juego:", gameState);
+      
+      // If game is in progress, show game area
+      if (msg.data.gameState !== "WAITING_PLAYERS") {
+        document.getElementById("lobby-area").classList.add("hidden");
+        document.getElementById("game-area").classList.remove("hidden");
+        
+        // Request current game state
+        ws.send(JSON.stringify({ type: "REQUEST_GAME_STATE" }));
+      } else {
+        // Update available avatars based on current players
+        if (msg.data.availableAvatars) {
+          avatars = msg.data.availableAvatars;
+        }
+
+        updateAvatarSelectorUI(myAvatar);
+        let avatarBtn = document.getElementById("avatar-btn");
+        avatarBtn.classList.remove("no-pointer-events");
+        avatarBtn.onclick = openAvatarModalFunc;
+      }
+      
+      if (msg.data.isAdmin) {
+        document.getElementById("admin-controls").classList.remove("hidden");
+        document.getElementById("game-admin-controls").classList.remove("hidden");
+      }
     }
-  }
 
-  if (msg.type === "PLAYER_LIST_UPDATE") {
-    console.log("Actualizando lista de jugadores:", msg.data.players);
-    currentPlayers = msg.data.players;
-    gameState = msg.data.gameState;
-    renderPlayers();
-    
-    if (gameState === "WAITING_PLAYERS") {
-      avatars = msg.data.availableAvatars;
-      console.log("actualizando modal...");
-      renderAvatarOptions();
+    if (msg.type === "PLAYER_LIST_UPDATE") {
+      console.log("Actualizando lista de jugadores:", msg.data.players);
+      currentPlayers = msg.data.players;
+      gameState = msg.data.gameState;
+      renderPlayers();
+      
+      if (gameState === "WAITING_PLAYERS") {
+        avatars = msg.data.availableAvatars;
+        console.log("actualizando modal...");
+        renderAvatarOptions();
+      }
     }
-  }
 
-  if (msg.type === "GAME_STARTED") {
-    document.getElementById("status").innerText = "🎮 Iniciando partida...";
-  }
-
-  if (msg.type === "ROUND_STARTED") {
-    // Show game area, hide lobby
-    document.getElementById("lobby-area").classList.add("hidden");
-    document.getElementById("game-area").classList.remove("hidden");
-    
-    // Show table card
-    const tableColor = msg.data.tableColor;
-    const tableCard = document.getElementById("table-card");
-    tableCard.className = `card table-card ${tableColor}`;
-    tableCard.textContent = tableColor;
-    
-    console.log("Ronda iniciada - Color de mesa:", tableColor);
-  }
-
-  if (msg.type === "HAND_DEALT") {
-    // Show my cards
-    const myHand = document.getElementById("my-hand");
-    myHand.innerHTML = "";
-    
-    let index = 0;
-    msg.data.cards.forEach(color => {
-      const cardDiv = document.createElement("div");
-      cardDiv.className = `card ${color} card-${index}`;
-      cardDiv.dataset.index = index;
-      // cardDiv.textContent = color;
-      myHand.appendChild(cardDiv);
-      index++;
-    });
-    
-    clearSelection();
-    console.log("Cartas recibidas:", msg.data.cards);
-  }
-
-  if (msg.type === "TURN_CHANGED") {
-    currentTurnPlayerId = msg.data.playerId;
-    const status = document.getElementById("status");
-    const playerName = msg.data.playerName;
-    
-    isMyTurn = (msg.data.playerId === myId);
-    
-    if (isMyTurn) {
-      status.textContent = "🎯 ES TU TURNO";
-      status.style.color = "#2ecc71";
-      document.getElementById("hand-info").classList.add("my-turn");
-    } else {
-      status.textContent = `⏳ Turno de: ${playerName}`;
-      status.style.color = "#95a5a6";
-      document.getElementById("hand-info").classList.remove("my-turn");
+    if (msg.type === "GAME_STARTED") {
+      document.getElementById("status").innerText = "🎮 Iniciando partida...";
     }
-    
-    clearSelection();
-    renderPlayers();
-    console.log("Turno de:", playerName);
-  }
-  
-  if (msg.type === "GAME_STATE") {
-    // Restore game state after reconnection
-    if (msg.data.tableColor) {
+
+    if (msg.type === "ROUND_STARTED") {
+      // Show game area, hide lobby
+      document.getElementById("lobby-area").classList.add("hidden");
+      document.getElementById("game-area").classList.remove("hidden");
+      
+      // Show table card
+      const tableColor = msg.data.tableColor;
       const tableCard = document.getElementById("table-card");
-      tableCard.className = `card table-card ${msg.data.tableColor}`;
-      tableCard.textContent = msg.data.tableColor;
+      tableCard.className = `card table-card ${tableColor}`;
+      tableCard.textContent = tableColor;
+      
+      console.log("Ronda iniciada - Color de mesa:", tableColor);
     }
-    
-    if (msg.data.myCards) {
+
+    if (msg.type === "HAND_DEALT") {
+      // Show my cards
       const myHand = document.getElementById("my-hand");
       myHand.innerHTML = "";
       
       let index = 0;
-      msg.data.myCards.forEach(color => {
+      msg.data.cards.forEach(color => {
         const cardDiv = document.createElement("div");
         cardDiv.className = `card ${color} card-${index}`;
         cardDiv.dataset.index = index;
@@ -707,14 +672,17 @@ ws.onmessage = (e) => {
         myHand.appendChild(cardDiv);
         index++;
       });
-    }
-    
-    if (msg.data.currentPlayerId !== undefined) {
-      currentTurnPlayerId = msg.data.currentPlayerId;
-      const status = document.getElementById("status");
-      const playerName = msg.data.currentPlayerName;
       
-      isMyTurn = (msg.data.currentPlayerId === myId);
+      clearSelection();
+      console.log("Cartas recibidas:", msg.data.cards);
+    }
+
+    if (msg.type === "TURN_CHANGED") {
+      currentTurnPlayerId = msg.data.playerId;
+      const status = document.getElementById("status");
+      const playerName = msg.data.playerName;
+      
+      isMyTurn = (msg.data.playerId === myId);
       
       if (isMyTurn) {
         status.textContent = "🎯 ES TU TURNO";
@@ -725,52 +693,97 @@ ws.onmessage = (e) => {
         status.style.color = "#95a5a6";
         document.getElementById("hand-info").classList.remove("my-turn");
       }
+      
+      clearSelection();
+      renderPlayers();
+      console.log("Turno de:", playerName);
     }
     
-    clearSelection();
-    renderPlayers();
-  }
-  
-  if (msg.type === "GAME_CANCELLED") {
-    alert("El juego ha sido cancelado por el administrador");
-    // Reset to lobby
-    document.getElementById("game-area").classList.add("hidden");
-    document.getElementById("lobby-area").classList.remove("hidden");
-    document.getElementById("status").innerText = "";
-    document.getElementById("my-hand").innerHTML = "";
-    document.getElementById("table-card").innerHTML = "";
-    document.getElementById("table-card").className = "card table-card";
-    isMyTurn = false;
-    currentTurnPlayerId = -1;
-    clearSelection();
-    renderPlayers();
-  }
-};
+    if (msg.type === "GAME_STATE") {
+      // Restore game state after reconnection
+      if (msg.data.tableColor) {
+        const tableCard = document.getElementById("table-card");
+        tableCard.className = `card table-card ${msg.data.tableColor}`;
+        tableCard.textContent = msg.data.tableColor;
+      }
+      
+      if (msg.data.myCards) {
+        const myHand = document.getElementById("my-hand");
+        myHand.innerHTML = "";
+        
+        let index = 0;
+        msg.data.myCards.forEach(color => {
+          const cardDiv = document.createElement("div");
+          cardDiv.className = `card ${color} card-${index}`;
+          cardDiv.dataset.index = index;
+          // cardDiv.textContent = color;
+          myHand.appendChild(cardDiv);
+          index++;
+        });
+      }
+      
+      if (msg.data.currentPlayerId !== undefined) {
+        currentTurnPlayerId = msg.data.currentPlayerId;
+        const status = document.getElementById("status");
+        const playerName = msg.data.currentPlayerName;
+        
+        isMyTurn = (msg.data.currentPlayerId === myId);
+        
+        if (isMyTurn) {
+          status.textContent = "🎯 ES TU TURNO";
+          status.style.color = "#2ecc71";
+          document.getElementById("hand-info").classList.add("my-turn");
+        } else {
+          status.textContent = `⏳ Turno de: ${playerName}`;
+          status.style.color = "#95a5a6";
+          document.getElementById("hand-info").classList.remove("my-turn");
+        }
+      }
+      
+      clearSelection();
+      renderPlayers();
+    }
+    
+    if (msg.type === "GAME_CANCELLED") {
+      alert("El juego ha sido cancelado por el administrador");
+      // Reset to lobby
+      document.getElementById("game-area").classList.add("hidden");
+      document.getElementById("lobby-area").classList.remove("hidden");
+      document.getElementById("status").innerText = "";
+      document.getElementById("my-hand").innerHTML = "";
+      document.getElementById("table-card").innerHTML = "";
+      document.getElementById("table-card").className = "card table-card";
+      isMyTurn = false;
+      currentTurnPlayerId = -1;
+      clearSelection();
+      renderPlayers();
+    }
+  };
 
-ws.onopen = () => {
-  console.log("Conectado al WebSocket");
-  
-  // Try to reconnect if we have a stored name
-  if (myName) {
-    ws.send(JSON.stringify({
-      type: "RECONNECT",
-      data: { name: myName }
-    }));
-  }
-};
+  ws.onopen = () => {
+    console.log("Conectado al WebSocket");
+    
+    // Try to reconnect if we have a stored name
+    if (myName) {
+      ws.send(JSON.stringify({
+        type: "RECONNECT",
+        data: { name: myName }
+      }));
+    }
+  };
 
-ws.onerror = (error) => {
-  console.error("Error WebSocket:", error);
-};
+  ws.onerror = (error) => {
+    console.error("Error WebSocket:", error);
+  };
 
-ws.onclose = () => {
-  console.log("WebSocket cerrado");
-  // Try to reconnect after 2 seconds
-  setTimeout(() => {
-    console.log("Intentando reconectar...");
-    ws = new WebSocket(`ws://${ip}/ws`);
-  }, 2000);
-};
+  ws.onclose = () => {
+    console.log("WebSocket cerrado");
+    // Try to reconnect after 2 seconds
+    setTimeout(() => {
+      console.log("Intentando reconectar...");
+      ws = new WebSocket(`ws://${ip}/ws`);
+    }, 2000);
+  };
 </script>
 <script src="https://unpkg.com/ionicons@4.1.2/dist/ionicons.js"></script>
 </body>

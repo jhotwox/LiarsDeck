@@ -10,6 +10,12 @@ Listen to ESP32:
 
 ```
 
+Server NGINX para desarrollo:
+``` BASH
+docker compose up -d
+docker compose down -v
+```
+
 ## License
 
 Lying Cards is licensed under the PolyForm Noncommercial License 1.0.0.
@@ -81,3 +87,4 @@ void handleReconnect(AsyncWebSocketClient *client, JsonVariant data) {
 - [x] In-game connected players
 - [x] In-game avatar selector
 - [] Refactor html and css into diferent files
+- [] Provar que funciona en red local (env production)
